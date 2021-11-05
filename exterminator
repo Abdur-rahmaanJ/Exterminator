@@ -7,6 +7,7 @@ from efl.elementary.box import Box
 from efl.elementary.button import Button
 from efl.elementary.label import Label
 from efl.elementary.panes import Panes
+from efl.elementary.scroller import ELM_SCROLLER_MOVEMENT_NO_BLOCK
 from efl.elementary.scroller import ELM_SCROLLER_POLICY_AUTO
 from efl.elementary.scroller import ELM_SCROLLER_POLICY_OFF
 from efl.elementary.scroller import ELM_SCROLLER_POLICY_ON
@@ -38,8 +39,20 @@ class SortedList(Scroller):
         ascending=True,
         **kwargs
     ):
+
+        '''
+        example of titles
+        titles = [
+            ("PID", True),
+            ("Process Name", True),
+            ("CPU", True),
+            ("Memory", True),
+            ("User", True),
+        ]
+        '''
         Scroller.__init__(self, parent_widget, *args, **kwargs)
         self.policy_set(ELM_SCROLLER_POLICY_AUTO, ELM_SCROLLER_POLICY_OFF)
+        self.movement_block = ELM_SCROLLER_MOVEMENT_NO_BLOCK
 
         self.main_box = Box(
             self, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH
@@ -53,27 +66,29 @@ class SortedList(Scroller):
         self.rows = []
         self.header_row = []
 
-        header = Panes(self, size_hint_weight=EXPAND_HORIZ, size_hint_align=FILL_HORIZ)
-        header.callback_unpress_add(self.cb_resize_pane)
-        header.show()
+        header_pane = Panes(self, size_hint_weight=EXPAND_HORIZ, size_hint_align=FILL_HORIZ)
+        header_pane.callback_unpress_add(self.cb_resize_pane)
+        header_pane.show()
 
         list_pane = Panes(self, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
         list_pane.callback_unpress_add(self.cb_resize_pane)
         list_pane.style_set("flush")
         list_pane.show()
 
-        header.data["related"] = list_pane
-        list_pane.data["related"] = header
+        header_pane.data["related"] = list_pane
+        list_pane.data["related"] = header_pane
 
-        self.scroller = Scroller(
+        self.list_scroller = Scroller(
             self, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH
         )
-        self.scroller.policy_set(ELM_SCROLLER_POLICY_OFF, ELM_SCROLLER_POLICY_ON)
-        self.scroller.content = list_pane
-        self.scroller.show()
+        self.list_scroller.policy_set(ELM_SCROLLER_POLICY_OFF, ELM_SCROLLER_POLICY_ON)
+        self.list_scroller.movement_block = ELM_SCROLLER_MOVEMENT_NO_BLOCK
+        # self.list_scroller.page_relative_set(1.0, 1.0)
+        self.list_scroller.content = list_pane
+        self.list_scroller.show()
 
         self.headers = []
-        self.headers.append(header)
+        self.headers.append(header_pane)
         self.list_panes = []
         self.list_panes.append(list_pane)
         self.lists = []
@@ -81,8 +96,8 @@ class SortedList(Scroller):
         if titles is not None:
             self.header_row_pack(titles)
 
-        self.main_box.pack_end(header)
-        self.main_box.pack_end(self.scroller)
+        self.main_box.pack_end(header_pane)
+        self.main_box.pack_end(self.list_scroller)
 
         self.content = self.main_box
         self.show()
@@ -193,6 +208,7 @@ class SortedList(Scroller):
         """Unpacks and hides, and optionally deletes, a row of items.
         The argument row can either be the row itself or its index number.
         """
+
         if isinstance(row, int):
             row_index = row
         else:
@@ -279,6 +295,7 @@ class SortedList(Scroller):
 
     def update(self):
         """Update"""
+        # print(self.list_scroller.child_size_get())
         self.sort_by_column(self.sort_column, self.sort_column_ascending)
 
 
@@ -643,7 +660,7 @@ class TaskManagerBox(Box):
             self.win, size_hint_weight=EXPAND_HORIZ, size_hint_align=FILL_HORIZ
         )
         self.kill_button.text = "Kill Selected Processes"
-        self.kill_button.callback_clicked_add(self.kill_selected)
+        self.kill_button.callback_clicked_add(self._kill_selected)
         self.kill_button.show()
 
 
@@ -733,10 +750,10 @@ class TaskManagerBox(Box):
         cmd = ecore.Exe(command)
         cmd.on_del_event_add(self.update)
 
-    def kill_selected(self):  # , bt):
+    def _kill_selected(self):  # , bt):
         """TODO: docstring"""
         for pid in self.appstokill:
-            self.kill_process(pid)
+            self._kill_process(pid)
 
     def check_sel(self, check):
         """TODO: docstring"""
@@ -746,7 +763,7 @@ class TaskManagerBox(Box):
             self.appstokill.remove(check.text)
         # print(self.appstokill)
 
-    def kill_process(self, pid):
+    def _kill_process(self, pid):
         """TODO: docstring"""
         self.run_command("kill -9 %s" % pid)
 
