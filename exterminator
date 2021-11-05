@@ -387,7 +387,7 @@ FILL_HORIZ = EVAS_HINT_FILL, 0.5
 
 # class ThreadedFunction(object):
 class ThreadedFunction:
-    """The ThreadedFunction class."""
+    """A simple thread management class to execute commands"""
 
     def __init__(self, done_cb=None):
         # private stuff
@@ -535,159 +535,39 @@ class ProcessRowList(list):
         self.mem_label.data["sort_data"] = mem
 
 
-class MainWindow(StandardWindow):
-    """The MainWindow class."""
-
-    def __init__(self):
-        """TODO: docstring"""
-        StandardWindow.__init__(self, "exterminator", "Exterminator", size=(800, 400))
-        self.callback_delete_request_add(self.quit_all)
-
-        icon = Icon(self)
-        icon.size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND)
-        icon.size_hint_align_set(EVAS_HINT_FILL, EVAS_HINT_FILL)
-        icon.standard_set("utilities-system-monitor")
-        icon.show()
-        self.icon_object_set(icon.object_get())
-
-        self.task_manager = TaskManager(self)
-        self.task_manager.show()
-
-        self.resize_object_add(self.task_manager)
-
-    def quit_all(self, _):
-        """TODO: docstring"""
-        self.task_manager.threaded_function.shutdown()
-        elm.exit()
-
-
-class TaskManager(Box):
-    """The TaskManager class."""
+class TaskManagerBox(Box):
+    """The TaskManagerBox class."""
 
     def __init__(self, parent):
-        """TODO: docstring"""
+        """
+        Init values + ui
+        """
         Box.__init__(self, parent)
-        self.win = win = parent
+
+
+        # init values
         self.appstokill = []
         self.process = {}
+        self.pids_to_update = {}
+        self.pids_to_remove = []
 
+        self.win = win = parent
         self.threaded_function = ThreadedFunction(self.refresh_gui)
-        self.getting_data = False
+        self.getting_data_flag = False
 
         self.size_hint_weight = EXPAND_BOTH
         self.size_hint_align = FILL_BOTH
 
         self.loop = ecore.timer_add(0.1, self.update)
 
-        self.cpu = None
-        self.ramtota = None
-        self.ramused = None
-
-        cpu = psutil.cpu_percent(interval=1) / 100.0
-        ram = psutil.virtual_memory()
+        self.cpu = psutil.cpu_percent(interval=1) / 100.0
+        self.ram = psutil.virtual_memory()
 
         # Totals in MB
-        ramtota = float(ram.total) / (1048576)
-        ramused = ramtota * ram.percent * 0.01
+        self.ram_total = float(self.ram.total) / (1048576)
+        self.ram_used = self.ram_total * self.ram.percent * 0.01
 
-        ramframe = self.ramframe = Frame(self.win)
-        ramframe.show()
-        ramframe.size_hint_weight = (EVAS_HINT_EXPAND, 0.0)
-        ramframe.size_hint_align = FILL_BOTH
-        ramframe.text_set("Memory Usage:")
 
-        self.rambar = rambar = Progressbar(
-            self.win,
-            span_size=250,
-            size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
-            size_hint_align=FILL_HORIZ,
-        )
-        rambar.show()
-        rambar.unit_format = "%.0f MB out of %.0f MB" % (ramused, ramtota)
-        rambar.value_set(ramused / ramtota)
-        ramframe.content = rambar
-
-        cpuframe = self.cpuframe = Frame(self.win)
-        cpuframe.show()
-        cpuframe.text_set("CPU Usage:")
-        cpuframe.size_hint_weight = (EVAS_HINT_EXPAND, 0.0)
-        cpuframe.size_hint_align = FILL_BOTH
-
-        self.cpubar = cpubar = Progressbar(
-            self.win,
-            span_size=250,
-            size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
-            size_hint_align=FILL_HORIZ,
-        )
-        cpubar.show()
-        cpubar.value_set(cpu)
-        cpuframe.content = cpubar
-
-        titles = [
-            ("PID", True),
-            ("Process Name", True),
-            ("CPU", True),
-            ("Memory", True),
-            ("User", True),
-        ]
-
-        self.slist = slist = SortedList(
-            self,
-            titles=titles,
-            size_hint_weight=EXPAND_BOTH,
-            size_hint_align=FILL_BOTH,
-            homogeneous=True,
-        )
-
-        slist.show()
-
-        kills = Button(
-            self.win, size_hint_weight=EXPAND_HORIZ, size_hint_align=FILL_HORIZ
-        )
-        kills.text = "Kill Selected Processes"
-        kills.callback_clicked_add(self.kill_selected)
-        kills.show()
-
-        icon = Icon(self.win, thumb="True")
-        icon.standard_set("help-about")
-
-        about = Button(self.win, size_hint_align=(1.0, 0.0))
-        about.content = icon
-        about.callback_clicked_add(self.show_about)
-        about.show()
-
-        top_box = Box(win)
-        top_box.horizontal = True
-        top_box.pack_end(cpuframe)
-        top_box.pack_end(ramframe)
-        top_box.show()
-
-        bottom_box = Box(win, size_hint_weight=EXPAND_HORIZ, size_hint_align=FILL_HORIZ)
-        bottom_box.horizontal = True
-        bottom_box.pack_end(kills)
-        bottom_box.pack_end(about)
-        bottom_box.show()
-
-        wheel = Progressbar(
-            self,
-            pulse_mode=True,
-            size_hint_weight=EXPAND_BOTH,
-            size_hint_align=FILL_HORIZ,
-        )
-        wheel.pulse(True)
-        wheel.show()
-
-        self.flip = Flip(self, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
-        self.flip.part_content_set("back", self.slist)
-        self.flip.part_content_set("front", wheel)
-        self.flip.show()
-
-        self.pack_end(top_box)
-        self.pack_end(self.flip)
-        self.pack_end(bottom_box)
-
-        self.pids_to_update = {}
-        self.pids_to_remove = []
 
         try:
             # psutil 2.x method
@@ -696,23 +576,137 @@ class TaskManager(Box):
             # psutil 1.x method
             self.cpu_count = psutil.NUM_CPUS
 
+
+        # ui
+        self.init_ui()
+
+
+
+    def init_ui(self):
+        # ram_frame holds ram_progress_bar
+        self.ram_frame = Frame(self.win)
+        self.ram_frame.show()
+        self.ram_frame.size_hint_weight = (EVAS_HINT_EXPAND, 0.0)
+        self.ram_frame.size_hint_align = FILL_BOTH
+        self.ram_frame.text_set("Memory Usage:")
+
+        self.ram_progress_bar = Progressbar(
+            self.win,
+            span_size=250,
+            size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
+            size_hint_align=FILL_HORIZ,
+        )
+        self.ram_progress_bar.show()
+        self.ram_progress_bar.unit_format = "%.0f MB out of %.0f MB" % (self.ram_used, self.ram_total)
+        self.ram_progress_bar.value_set(self.ram_used / self.ram_total)
+        self.ram_frame.content = self.ram_progress_bar
+
+
+        # cpu_frame holds cpu_progress_bar
+        self.cpu_frame = Frame(self.win)
+        self.cpu_frame.show()
+        self.cpu_frame.text_set("CPU Usage:")
+        self.cpu_frame.size_hint_weight = (EVAS_HINT_EXPAND, 0.0)
+        self.cpu_frame.size_hint_align = FILL_BOTH
+
+        self.cpu_progress_bar = Progressbar(
+            self.win,
+            span_size=250,
+            size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
+            size_hint_align=FILL_HORIZ,
+        )
+        self.cpu_progress_bar.show()
+        self.cpu_progress_bar.value_set(self.cpu)
+        self.cpu_frame.content = self.cpu_progress_bar
+
+
+        # sorted list with scroll bar
+        self.titles = [
+            ("PID", True),
+            ("Process Name", True),
+            ("CPU", True),
+            ("Memory", True),
+            ("User", True),
+        ]
+        self.slist = slist = SortedList(
+            self,
+            titles=self.titles,
+            size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_BOTH,
+            homogeneous=True,
+        )
+        slist.show()
+
+
+        # kill process button
+        self.kill_button = Button(
+            self.win, size_hint_weight=EXPAND_HORIZ, size_hint_align=FILL_HORIZ
+        )
+        self.kill_button.text = "Kill Selected Processes"
+        self.kill_button.callback_clicked_add(self.kill_selected)
+        self.kill_button.show()
+
+
+        # about button holds about icon 
+        self.about_icon = Icon(self.win, thumb="True")
+        self.about_icon.standard_set("help-about")
+
+        self.about_button = Button(self.win, size_hint_align=(1.0, 0.0))
+        self.about_button.content = self.about_icon
+        self.about_button.callback_clicked_add(self.show_about)
+        self.about_button.show()
+
+
+        top_box = Box(self.win)
+        top_box.horizontal = True
+        top_box.pack_end(self.cpu_frame)
+        top_box.pack_end(self.ram_frame)
+        top_box.show()
+
+
+        bottom_box = Box(self.win, size_hint_weight=EXPAND_HORIZ, size_hint_align=FILL_HORIZ)
+        bottom_box.horizontal = True
+        bottom_box.pack_end(self.kill_button)
+        bottom_box.pack_end(self.about_button)
+        bottom_box.show()
+
+
+        loading_progress_bar = Progressbar(
+            self,
+            pulse_mode=True,
+            size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_HORIZ,
+        )
+        loading_progress_bar.pulse(True)
+        loading_progress_bar.show()
+
+
+        self.sortedlist_progress_flip = Flip(self, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
+        self.sortedlist_progress_flip.part_content_set("back", self.slist)
+        self.sortedlist_progress_flip.part_content_set("front", loading_progress_bar)
+        self.sortedlist_progress_flip.show()
+
+        self.pack_end(top_box)
+        self.pack_end(self.sortedlist_progress_flip)
+        self.pack_end(bottom_box)
+
+
     def update(self):  # , stuff=None, otherstuff=None):
         """TODO: docstring"""
-        if not self.getting_data:
+        if not self.getting_data_flag is True:
             self.threaded_function.run(self.get_psutil_data)
 
         return 1
 
     def refresh_gui(self):
         """TODO: docstring"""
-        for pid in self.pids_to_update:
-            if pid in self.process:
+        for pid in self.pids_to_update: # dict
+            if pid in self.process: # dict
                 self.process[pid].update(self.pids_to_update[pid])
             else:
-                cess = ProcessRowList(self, self.pids_to_update[pid])
-                # print('...', cess)
-                self.process[pid] = cess
-                self.slist.row_pack(cess, sort=False)
+                process_row_list = ProcessRowList(self, self.pids_to_update[pid]) # list
+                self.process[pid] = process_row_list
+                self.slist.row_pack(process_row_list, sort=False)
 
         for pid in self.pids_to_remove:
             if pid in self.process:
@@ -724,15 +718,15 @@ class TaskManager(Box):
 
         self.slist.update()
 
-        self.cpubar.value_set(self.cpu)
-        self.rambar.value_set(self.ramused / self.ramtota)
-        self.rambar.unit_format = "%.0f MB out of %.0f MB" % (
-            self.ramused,
-            self.ramtota,
+        self.cpu_progress_bar.value_set(self.cpu)
+        self.ram_progress_bar.value_set(self.ram_used / self.ram_total)
+        self.ram_progress_bar.unit_format = "%.0f MB out of %.0f MB" % (
+            self.ram_used,
+            self.ram_total,
         )
 
-        if self.flip.front_visible:
-            self.flip.go(ELM_FLIP_CUBE_DOWN)
+        if self.sortedlist_progress_flip.front_visible:
+            self.sortedlist_progress_flip.go(ELM_FLIP_CUBE_DOWN)
 
     def run_command(self, command):
         """TODO: docstring"""
@@ -759,7 +753,7 @@ class TaskManager(Box):
     def get_psutil_data(self):  # , cmd=False, arg=False):
         """TODO: docstring"""
         # print("cmd %s , arg %s" % (cmd, arg))
-        self.getting_data = True
+        self.getting_data_flag = True
         print("getting data")
         tmp = list(psutil.process_iter())
         currentpids = []
@@ -791,9 +785,9 @@ class TaskManager(Box):
         ram = psutil.virtual_memory()
 
         # Totals in MB
-        self.ramtota = float(ram.total) / (1048576)
-        self.ramused = self.ramtota * ram.percent * 0.01
-        self.getting_data = False
+        self.ram_total = float(self.ram.total) / (1048576)
+        self.ram_used = self.ram_total * self.ram.percent * 0.01
+        self.getting_data_flag = False
 
     def show_about(self, _=False):
         """TODO: docstring"""
@@ -810,6 +804,39 @@ class TaskManager(Box):
             )
         except InstanceError:
             pass
+
+class MainWindow(StandardWindow):
+    """The MainWindow class."""
+
+    def __init__(self):
+        """
+        Contains TaskManagerBoxView mainly and 
+        quits threads on exiting
+        """
+        StandardWindow.__init__(self, "exterminator", "Exterminator", size=(800, 400))
+        self.callback_delete_request_add(self.quit_all)
+
+        icon = Icon(self)
+        icon.size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND)
+        icon.size_hint_align_set(EVAS_HINT_FILL, EVAS_HINT_FILL)
+        icon.standard_set("utilities-system-monitor")
+        icon.show()
+        self.icon_object_set(icon.object_get())
+
+        self.task_manager = TaskManagerBox(self)
+        self.task_manager.show()
+
+        self.resize_object_add(self.task_manager)
+
+    def quit_all(self, _):
+        """
+        Kill threads
+        """
+        self.task_manager.threaded_function.shutdown()
+        elm.exit()
+
+
+
 
 
 
