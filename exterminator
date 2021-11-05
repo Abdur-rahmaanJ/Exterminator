@@ -431,6 +431,110 @@ class ThreadedFunction:
             self._reply_queue.put("done")
 
 
+class ProcessRowList(list):
+    """A list consisting of:
+    [
+        Check: checkbox to select process with PID text,
+        Label: Process name,
+        Label: CPU,
+        Label: Memory,
+        Label: User
+    ]
+
+    inheriting from list allows crazy stuffs like
+    self.append and is one of the most brutal programming
+    practices i have ever seen
+
+    was previously named: Process
+    """
+
+    def __init__(self, parent, data: dict):
+        """
+        data: {
+                        "pid": process.pid,
+                        "name": name,
+                        "username": username,
+                        "cpu": (process.cpu_percent(interval=0) / self.cpu_count),
+                        "mem": float(process.memory_info().rss) / 1048576,
+                    }
+        parent: Any element, self passed for Box
+        """
+        super().__init__()
+        self.win = parent.win
+        self.data = data
+
+        # Ui elements that will be used
+        self.pid_check = None
+        self.pname_label = None
+        self.user_label = None
+        self.cpu_label = None
+        self.mem_label = None
+
+        
+        # checkbox used to select process and kill
+        process_data = str(data["pid"])
+        self.pid_check = Check(self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
+        self.pid_check.text = process_data
+        self.pid_check.data["sort_data"] = data["pid"]
+        self.pid_check.callback_changed_add(parent.check_sel)
+        self.pid_check.show()
+
+
+        # label for name of process
+        self.pname_label = Label(self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
+        # self.pname.text = data["name"][0:25]
+        self.pname_label.text = data["name"]
+        self.pname_label.show()
+
+
+        # label for linux user username
+        self.user_label = Label(self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
+        self.user_label.text = data["username"]
+        self.user_label.show()
+
+
+        # label for cpu usage for process
+        self.cpu_label = Label(
+            self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH
+        )
+        cpu = data["cpu"]
+        self.cpu_label.text = "%.0f %%" % cpu
+        self.cpu_label.data["sort_data"] = cpu
+        self.cpu_label.show()
+
+
+        # label for memory usage for process
+        self.mem_label = Label(
+            self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH
+        )
+        mem = data["mem"]
+        self.mem_label.text = "%.1f MB" % mem
+        self.mem_label.data["sort_data"] = mem
+        self.mem_label.show()
+
+
+        # Add the ui elements to self which is a list
+        self.append(self.pid_check)
+        self.append(self.pname_label)
+        self.append(self.cpu_label)
+        self.append(self.mem_label)
+        self.append(self.user_label)
+
+
+    def update(self, data: dict):
+        """
+        data same as above, only updates CPU and 
+        memory labels
+        """
+        self.data = data
+        cpu = data["cpu"]
+        self.cpu_label.text = "%.0f %%" % cpu
+        self.cpu_label.data["sort_data"] = cpu
+        mem = data["mem"]
+        self.mem_label.text = "%.1f MB" % mem
+        self.mem_label.data["sort_data"] = mem
+
+
 class MainWindow(StandardWindow):
     """The MainWindow class."""
 
@@ -605,7 +709,7 @@ class TaskManager(Box):
             if pid in self.process:
                 self.process[pid].update(self.pids_to_update[pid])
             else:
-                cess = Process(self, self.pids_to_update[pid])
+                cess = ProcessRowList(self, self.pids_to_update[pid])
                 # print('...', cess)
                 self.process[pid] = cess
                 self.slist.row_pack(cess, sort=False)
@@ -708,63 +812,6 @@ class TaskManager(Box):
             pass
 
 
-class Process(list):
-    """TODO: docstring"""
-
-    def __init__(self, parent, data):
-        """TODO: docstring"""
-        super().__init__()
-        self.win = parent.win
-        self.data = data
-
-        process_data = str(data["pid"])
-
-        pid = Check(self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
-        pid.text = process_data
-        pid.data["sort_data"] = data["pid"]
-        pid.callback_changed_add(parent.check_sel)
-        pid.show()
-
-        pname = Label(self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
-        # pname.text = data["name"][0:25]
-        pname.text = data["name"]
-        pname.show()
-
-        user = Label(self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
-        user.text = data["username"]
-        user.show()
-
-        self.cpu = Label(
-            self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH
-        )
-        cpu = data["cpu"]
-        self.cpu.text = "%.0f %%" % cpu
-        self.cpu.data["sort_data"] = cpu
-        self.cpu.show()
-
-        self.mem = Label(
-            self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH
-        )
-        mem = data["mem"]
-        self.mem.text = "%.1f MB" % mem
-        self.mem.data["sort_data"] = mem
-        self.mem.show()
-
-        self.append(pid)
-        self.append(pname)
-        self.append(self.cpu)
-        self.append(self.mem)
-        self.append(user)
-
-    def update(self, data):
-        """TODO: docstring"""
-        self.data = data
-        cpu = data["cpu"]
-        self.cpu.text = "%.0f %%" % cpu
-        self.cpu.data["sort_data"] = cpu
-        mem = data["mem"]
-        self.mem.text = "%.1f MB" % mem
-        self.mem.data["sort_data"] = mem
 
 
 if __name__ == "__main__":
