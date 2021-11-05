@@ -4,39 +4,45 @@
 
 # General imports
 import getpass
-import threading
 import queue as Queue
+import threading
+
+# efl imports
+import efl.elementary as elm
 # from multiprocessing import Queue
 import psutil
+from efl import ecore
+from efl.elementary.box import Box
+from efl.elementary.button import Button
+from efl.elementary.check import Check
+from efl.elementary.flip import ELM_FLIP_CUBE_DOWN
+from efl.elementary.flip import Flip
+from efl.elementary.frame import Frame
+from efl.elementary.icon import Icon
+from efl.elementary.label import Label
+from efl.elementary.progressbar import Progressbar
+# from efl.elementary.separator import Separator
+from efl.elementary.window import StandardWindow
+from efl.evas import EVAS_HINT_EXPAND
+from efl.evas import EVAS_HINT_FILL
+from elmextensions import AboutWindow
+from elmextensions import InstanceError
+from elmextensions import SortedList
+
 # try:                         # Python 2.x
 #     import Queue
 # except ModuleNotFoundError:  # Python 3.x
 
-# efl imports
-import efl.elementary as elm
-from efl.elementary.box import Box
-from efl.elementary.button import Button
-from efl.elementary.check import Check
-from efl.elementary.label import Label
-from efl.elementary.icon import Icon
-from efl.elementary.frame import Frame
-from efl.elementary.progressbar import Progressbar
-# from efl.elementary.separator import Separator
-from efl.elementary.window import StandardWindow
-from efl.elementary.flip import Flip, ELM_FLIP_CUBE_DOWN
-from efl.evas import EVAS_HINT_EXPAND, EVAS_HINT_FILL
-from efl import ecore
 
-from elmextensions import AboutWindow, InstanceError
-from elmextensions import SortedList
+
 
 __author__ = "Jeff Hoogland"
 __contributors__ = ["Jeff Hoogland", "Scimmia"]
 __copyright__ = "Copyright (C) 2014 Bodhi Linux"
 __version__ = "0.2.4"
-__description__ = 'A simple task manager for the Enlightenment Desktop.'
-__github__ = 'http://jeffhoogland.github.io/Exterminator/'
-__source__ = 'Source code and bug reports: {0}'.format(__github__)
+__description__ = "A simple task manager for the Enlightenment Desktop."
+__github__ = "http://jeffhoogland.github.io/Exterminator/"
+__source__ = "Source code and bug reports: {0}".format(__github__)
 PY_EFL = "https://git.enlightenment.org/bindings/python/python-efl.git/"
 
 AUTHORS = """
@@ -96,7 +102,7 @@ FILL_HORIZ = EVAS_HINT_FILL, 0.5
 
 
 # class ThreadedFunction(object):
-class ThreadedFunction():
+class ThreadedFunction:
     """The ThreadedFunction class."""
 
     def __init__(self, done_cb=None):
@@ -118,7 +124,7 @@ class ThreadedFunction():
     def shutdown(self):
         """Adds the Quit function to the command queue."""
         self._timer.delete()
-        self._command_queue.put('QUIT')
+        self._command_queue.put("QUIT")
 
     def check_reply_queue(self):
         """Checks if commands in command queue were executed"""
@@ -136,7 +142,7 @@ class ThreadedFunction():
             func = self._command_queue.get()
             if callable(func):
                 func()
-            elif func == 'QUIT':
+            elif func == "QUIT":
                 break
             self._reply_queue.put("done")
 
@@ -146,16 +152,13 @@ class MainWindow(StandardWindow):
 
     def __init__(self):
         """TODO: docstring"""
-        StandardWindow.__init__(self,
-                                "exterminator",
-                                "Exterminator",
-                                size=(800, 400))
+        StandardWindow.__init__(self, "exterminator", "Exterminator", size=(800, 400))
         self.callback_delete_request_add(self.quit_all)
 
         icon = Icon(self)
         icon.size_hint_weight_set(EVAS_HINT_EXPAND, EVAS_HINT_EXPAND)
         icon.size_hint_align_set(EVAS_HINT_FILL, EVAS_HINT_FILL)
-        icon.standard_set('utilities-system-monitor')
+        icon.standard_set("utilities-system-monitor")
         icon.show()
         self.icon_object_set(icon.object_get())
 
@@ -197,7 +200,7 @@ class TaskManager(Box):
 
         # Totals in MB
         ramtota = float(ram.total) / (1048576)
-        ramused = ramtota * ram.percent * .01
+        ramused = ramtota * ram.percent * 0.01
 
         ramframe = self.ramframe = Frame(self.win)
         ramframe.show()
@@ -205,11 +208,12 @@ class TaskManager(Box):
         ramframe.size_hint_align = FILL_BOTH
         ramframe.text_set("Memory Usage:")
 
-        self.rambar = rambar = Progressbar(self.win,
-                                           span_size=250,
-                                           size_hint_weight=(EVAS_HINT_EXPAND,
-                                                             0.0),
-                                           size_hint_align=FILL_HORIZ)
+        self.rambar = rambar = Progressbar(
+            self.win,
+            span_size=250,
+            size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
+            size_hint_align=FILL_HORIZ,
+        )
         rambar.show()
         rambar.unit_format = "%.0f MB out of %.0f MB" % (ramused, ramtota)
         rambar.value_set(ramused / ramtota)
@@ -221,35 +225,43 @@ class TaskManager(Box):
         cpuframe.size_hint_weight = (EVAS_HINT_EXPAND, 0.0)
         cpuframe.size_hint_align = FILL_BOTH
 
-        self.cpubar = cpubar = Progressbar(self.win,
-                                           span_size=250,
-                                           size_hint_weight=(EVAS_HINT_EXPAND,
-                                                             0.0),
-                                           size_hint_align=FILL_HORIZ)
+        self.cpubar = cpubar = Progressbar(
+            self.win,
+            span_size=250,
+            size_hint_weight=(EVAS_HINT_EXPAND, 0.0),
+            size_hint_align=FILL_HORIZ,
+        )
         cpubar.show()
         cpubar.value_set(cpu)
         cpuframe.content = cpubar
 
-        titles = [("PID", True), ("Process Name", True), ("CPU", True),
-                  ("Memory", True), ("User", True)]
+        titles = [
+            ("PID", True),
+            ("Process Name", True),
+            ("CPU", True),
+            ("Memory", True),
+            ("User", True),
+        ]
 
-        self.slist = slist = SortedList(self,
-                                        titles=titles,
-                                        size_hint_weight=EXPAND_BOTH,
-                                        size_hint_align=FILL_BOTH,
-                                        homogeneous=True)
+        self.slist = slist = SortedList(
+            self,
+            titles=titles,
+            size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_BOTH,
+            homogeneous=True,
+        )
 
         slist.show()
 
-        kills = Button(self.win,
-                       size_hint_weight=EXPAND_HORIZ,
-                       size_hint_align=FILL_HORIZ)
+        kills = Button(
+            self.win, size_hint_weight=EXPAND_HORIZ, size_hint_align=FILL_HORIZ
+        )
         kills.text = "Kill Selected Processes"
         kills.callback_clicked_add(self.kill_selected)
         kills.show()
 
-        icon = Icon(self.win, thumb='True')
-        icon.standard_set('help-about')
+        icon = Icon(self.win, thumb="True")
+        icon.standard_set("help-about")
 
         about = Button(self.win, size_hint_align=(1.0, 0.0))
         about.content = icon
@@ -262,24 +274,22 @@ class TaskManager(Box):
         top_box.pack_end(ramframe)
         top_box.show()
 
-        bottom_box = Box(win,
-                         size_hint_weight=EXPAND_HORIZ,
-                         size_hint_align=FILL_HORIZ)
+        bottom_box = Box(win, size_hint_weight=EXPAND_HORIZ, size_hint_align=FILL_HORIZ)
         bottom_box.horizontal = True
         bottom_box.pack_end(kills)
         bottom_box.pack_end(about)
         bottom_box.show()
 
-        wheel = Progressbar(self,
-                            pulse_mode=True,
-                            size_hint_weight=EXPAND_BOTH,
-                            size_hint_align=FILL_HORIZ)
+        wheel = Progressbar(
+            self,
+            pulse_mode=True,
+            size_hint_weight=EXPAND_BOTH,
+            size_hint_align=FILL_HORIZ,
+        )
         wheel.pulse(True)
         wheel.show()
 
-        self.flip = Flip(self,
-                         size_hint_weight=EXPAND_BOTH,
-                         size_hint_align=FILL_BOTH)
+        self.flip = Flip(self, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
         self.flip.part_content_set("back", self.slist)
         self.flip.part_content_set("front", wheel)
         self.flip.show()
@@ -327,8 +337,10 @@ class TaskManager(Box):
 
         self.cpubar.value_set(self.cpu)
         self.rambar.value_set(self.ramused / self.ramtota)
-        self.rambar.unit_format = "%.0f MB out of %.0f MB" % (self.ramused,
-                                                              self.ramtota)
+        self.rambar.unit_format = "%.0f MB out of %.0f MB" % (
+            self.ramused,
+            self.ramtota,
+        )
 
         if self.flip.front_visible:
             self.flip.go(ELM_FLIP_CUBE_DOWN)
@@ -376,9 +388,8 @@ class TaskManager(Box):
                         "pid": process.pid,
                         "name": name,
                         "username": username,
-                        "cpu":
-                            (process.cpu_percent(interval=0) / self.cpu_count),
-                        "mem": float(process.memory_info().rss) / 1048576
+                        "cpu": (process.cpu_percent(interval=0) / self.cpu_count),
+                        "mem": float(process.memory_info().rss) / 1048576,
                     }
             except TypeError:
                 pass
@@ -391,20 +402,22 @@ class TaskManager(Box):
 
         # Totals in MB
         self.ramtota = float(ram.total) / (1048576)
-        self.ramused = self.ramtota * ram.percent * .01
+        self.ramused = self.ramtota * ram.percent * 0.01
         self.getting_data = False
 
     def show_about(self, _=False):
         """TODO: docstring"""
         try:
-            AboutWindow(self,
-                        title="Exterminator",
-                        standardicon="utilities-system-monitor",
-                        version=__version__,
-                        authors=AUTHORS,
-                        licen=LICENSE,
-                        webaddress=__github__,
-                        info=INFO)
+            AboutWindow(
+                self,
+                title="Exterminator",
+                standardicon="utilities-system-monitor",
+                version=__version__,
+                authors=AUTHORS,
+                licen=LICENSE,
+                webaddress=__github__,
+                info=INFO,
+            )
         except InstanceError:
             pass
 
@@ -420,38 +433,32 @@ class Process(list):
 
         process_data = str(data["pid"])
 
-        pid = Check(self.win,
-                    size_hint_weight=EXPAND_BOTH,
-                    size_hint_align=FILL_BOTH)
+        pid = Check(self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
         pid.text = process_data
         pid.data["sort_data"] = data["pid"]
         pid.callback_changed_add(parent.check_sel)
         pid.show()
 
-        pname = Label(self.win,
-                      size_hint_weight=EXPAND_BOTH,
-                      size_hint_align=FILL_BOTH)
+        pname = Label(self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
         # pname.text = data["name"][0:25]
         pname.text = data["name"]
         pname.show()
 
-        user = Label(self.win,
-                     size_hint_weight=EXPAND_BOTH,
-                     size_hint_align=FILL_BOTH)
+        user = Label(self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH)
         user.text = data["username"]
         user.show()
 
-        self.cpu = Label(self.win,
-                         size_hint_weight=EXPAND_BOTH,
-                         size_hint_align=FILL_BOTH)
+        self.cpu = Label(
+            self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH
+        )
         cpu = data["cpu"]
         self.cpu.text = "%.0f %%" % cpu
         self.cpu.data["sort_data"] = cpu
         self.cpu.show()
 
-        self.mem = Label(self.win,
-                         size_hint_weight=EXPAND_BOTH,
-                         size_hint_align=FILL_BOTH)
+        self.mem = Label(
+            self.win, size_hint_weight=EXPAND_BOTH, size_hint_align=FILL_BOTH
+        )
         mem = data["mem"]
         self.mem.text = "%.1f MB" % mem
         self.mem.data["sort_data"] = mem
