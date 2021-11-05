@@ -6,12 +6,16 @@ Radiance Theme:
 Default Theme:
 ![alt text](https://raw.githubusercontent.com/JeffHoogland/exterminator/master/screenshot/exterminator-default.png "Exterminator")
 
-Requires:
-- [python 2.7](https://www.python.org/)
-- [pyefl >= 1.12](http://git.enlightenment.org/bindings/python/python-efl.git/)
-- [elmextensions >= 0.1.3](https://github.com/JeffHoogland/python-elm-extensions)
-- [psutil](https://pypi.python.org/pypi/psutil/2.2.0)
+
+Tested with:
+
+- Python3.9
+- Python-efl 1.25.0
+- Elmextentions Python3 v 0.3.1rc.0
+- Other libs as in requirements.txt
 
 Credits: 
 - [Jeff Hoogland](http://www.jeffhoogland.com/)
+- [SRP0706](https://github.com/srp0706/)
+- [Abdur-Rahmaan Janhangeer](https://www.compileralchemy.com)
 
